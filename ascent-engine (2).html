@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ascent — lead-nurture engine</title>
+<style>
+:root{
+  --b50:#eef4fb;--b100:#dde9f7;--b200:#bcd3ee;--b300:#8fb4e2;--b400:#5b8fd1;
+  --b500:#2f6fbd;--b600:#1f5aa6;--b700:#184a87;--b800:#123a6b;--b900:#0c2c52;
+  --ink:#0e2440;--muted:#5d6e85;--faint:#8597ac;--paper:#fff;--bg:#eef2f8;
+  --line:#d4e0ef;--line2:#c2d3e8;--shadow:0 1px 2px rgba(12,44,82,.06),0 6px 20px rgba(12,44,82,.08);
+  --radius:10px;--font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"SFMono-Regular",Consolas,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--font);color:var(--ink);background:var(--bg);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;overflow:hidden}
+button{font-family:inherit}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.top{display:flex;align-items:center;gap:16px;padding:11px 20px;background:var(--b900);color:#fff;position:relative;z-index:40}
+.brand{display:flex;flex-direction:column;line-height:1.15}
+.brand b{font-size:16px;font-weight:600;letter-spacing:.2px}
+.brand span{font-size:11px;color:#9fc0e8;letter-spacing:.4px}
+.spacer{flex:1}
+.seg,.toggle{display:flex;background:rgba(255,255,255,.10);border-radius:8px;padding:3px}
+.seg button{border:0;background:transparent;color:#bcd6f4;font-size:12.5px;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer}
+.seg button.on{background:#fff;color:var(--b800)}
+.tbtn{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06);color:#d7e7fa;font-size:12.5px;padding:7px 13px;border-radius:8px;cursor:pointer;font-weight:500}
+.tbtn:hover{background:rgba(255,255,255,.14)}
+.phase{display:flex;align-items:center;gap:9px}
+.phase .lab{font-size:11px;color:#9fc0e8;letter-spacing:.4px}
+.toggle button{border:0;background:transparent;color:#bcd6f4;font-size:12px;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer}
+.toggle button.on{background:#fff;color:var(--b800)}
+.strip{display:flex;align-items:center;gap:10px;padding:9px 20px;background:var(--paper);border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);z-index:30;position:relative}
+.strip b{color:var(--ink);font-weight:600}
+.chip{font-size:11px;background:var(--b50);color:var(--b700);border:1px solid var(--b200);padding:3px 9px;border-radius:20px;font-weight:500}
+.zoom{margin-left:auto;display:flex;gap:6px;align-items:center}
+.zoom button{width:26px;height:26px;border:1px solid var(--line2);background:var(--paper);border-radius:6px;cursor:pointer;color:var(--muted);font-size:15px;line-height:1}
+.zoom button:hover{border-color:var(--b400);color:var(--b600)}
+.wrap{position:absolute;inset:0;top:106px;overflow:auto;background:radial-gradient(circle at 1px 1px,#d9e3f1 1px,transparent 0) 0 0/22px 22px,var(--bg)}
+#stage{transform-origin:top left}
+#canvas{position:relative;width:1080px;height:1075px;margin:24px}
+#edges{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+#edges path.hit{pointer-events:stroke;stroke:transparent;stroke-width:28;fill:none;cursor:pointer;stroke-linecap:round}
+#edges path.vis{fill:none;stroke:var(--b400);stroke-width:1.6}
+#edges path.vis.dash{stroke-dasharray:5 5;stroke:var(--b300)}
+#edges path.vis.accent{stroke:var(--b600);stroke-width:2}
+#edges .elabel{fill:var(--muted);font-size:10.5px;font-weight:500;paint-order:stroke;stroke:var(--bg);stroke-width:4px}
+#edges g.edge:hover path.vis{stroke:var(--b700);stroke-width:2.4}
+.node{position:absolute;border:1.5px solid var(--b400);background:var(--paper);border-radius:var(--radius);padding:9px 11px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px;box-shadow:var(--shadow);transition:transform .14s,box-shadow .14s,opacity .2s,border-color .2s;overflow:visible}
+.node:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(12,44,82,.12),0 14px 30px rgba(12,44,82,.14);border-color:var(--b600)}
+.node:focus-visible{outline:3px solid var(--b300);outline-offset:2px}
+.node .lyr{font-size:9.5px;font-weight:700;letter-spacing:.6px;color:var(--faint);text-transform:uppercase}
+.node .ttl{font-size:13.5px;font-weight:600;line-height:1.2;color:var(--ink)}
+.node .sub{font-size:11px;color:var(--muted);line-height:1.25}
+.node .meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto;padding-top:3px}
+.pill{font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 6px;border-radius:5px;background:var(--b50);color:var(--b700);border:1px solid var(--b200);text-transform:uppercase}
+.pill.rule{background:#eef1f5;color:#52617a;border-color:#d6dfeb}
+.pill.store{background:#e9eef9;color:var(--b800);border-color:#c7d6ef}
+.bge{font-size:9.5px;font-weight:600;letter-spacing:.2px;padding:2px 6px;border-radius:5px;border:1px dashed var(--b300);color:var(--b600)}
+.bge.built{border-style:solid;border-color:var(--b500);background:var(--b50)}
+.bge.locked{border-color:#c2cdda;color:#7a8aa0}
+.node.brain{background:var(--b600);border-color:var(--b700)}
+.node.brain .ttl{color:#fff}.node.brain .sub{color:#cfe0f6}.node.brain .lyr{color:#9fc0e8}
+.node.brain .pill{background:rgba(255,255,255,.16);color:#eaf2fc;border-color:rgba(255,255,255,.25)}
+.node.brain .bge{border-color:rgba(255,255,255,.45);color:#eaf2fc}
+.node.brain .bge.built{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.5)}
+.node.spine{background:var(--b800);border-color:var(--b900);align-items:flex-start;justify-content:center}
+.node.spine .ttl{color:#fff;font-size:15px}.node.spine .sub{color:#a9c6ec;font-size:11.5px}.node.spine .lyr{color:#7ea6d6}
+.node.ext{background:#eef1f5;border:1.5px dotted #a7b6ca}
+.node.ext .ttl{color:#3f4d62}.node.ext .sub{color:#6b7a8f}.node.ext .lyr{color:#93a2b6}
+.node.term{background:#f3f5f9;border:1.5px dashed #b9c6d8}
+.node.term .ttl{color:#52617a}.node.term .sub{color:#7a8aa0}
+.gateTab{position:absolute;top:-10px;left:10px;background:var(--b900);color:#fff;font-size:9px;font-weight:700;letter-spacing:.5px;padding:2px 7px;border-radius:5px;text-transform:uppercase}
+.node.hasgate{box-shadow:inset 0 3px 0 var(--b900),var(--shadow)}
+.node.dim{opacity:.22;filter:saturate(.4)}
+.node.hot{box-shadow:0 0 0 3px var(--b300),0 8px 26px rgba(31,90,166,.3);transform:translateY(-2px)}
+.node.rel{box-shadow:0 0 0 2px var(--b400)}
+.cluster{position:absolute;border:1.5px dashed var(--b300);border-radius:12px;background:rgba(255,255,255,.55);padding:9px 12px}
+.cluster>.clab{font-size:9.5px;font-weight:700;letter-spacing:.6px;color:var(--b600);text-transform:uppercase;margin-bottom:8px;display:block}
+.cluster .grid{display:grid;gap:9px}
+.cluster .chip{border:1.5px solid var(--b400);background:var(--paper);border-radius:8px;padding:7px 9px;cursor:pointer;text-align:left;box-shadow:var(--shadow);transition:transform .14s,box-shadow .14s,border-color .2s}
+.cluster .chip:hover{transform:translateY(-2px);border-color:var(--b600)}
+.cluster .chip:focus-visible{outline:3px solid var(--b300);outline-offset:2px}
+.cluster .chip .ct{font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.15}
+.cluster .chip .cs{font-size:10.5px;color:var(--muted)}
+.cluster .chip .cm{margin-top:5px;display:flex;gap:4px;flex-wrap:wrap}
+.cluster .chip.brainchip{background:var(--b600);border-color:var(--b700)}
+.cluster .chip.brainchip .ct{color:#fff}.cluster .chip.brainchip .cs{color:#cfe0f6}
+.cluster .chip.brainchip .pill{background:rgba(255,255,255,.16);color:#eaf2fc;border-color:rgba(255,255,255,.25)}
+.cluster .chip.brainchip .bge{border-color:rgba(255,255,255,.45);color:#eaf2fc}
+.cluster.crosscut{border-color:var(--b400);background:rgba(238,244,251,.7)}
+.cluster .chip.dim{opacity:.25}.cluster .chip.rel{box-shadow:0 0 0 2px var(--b400)}
+.cluster .chip.hot{box-shadow:0 0 0 3px var(--b300),0 8px 22px rgba(31,90,166,.28)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<style>
+.panel{position:fixed;top:0;right:0;height:100%;width:430px;max-width:92vw;background:var(--paper);border-left:1px solid var(--line);box-shadow:-10px 0 40px rgba(12,44,82,.16);z-index:60;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.panel.open{transform:none}
+.phead{padding:18px 20px 14px;border-bottom:1px solid var(--line);position:relative;background:var(--b50)}
+.phead .pl{font-size:10px;font-weight:700;letter-spacing:.7px;color:var(--b600);text-transform:uppercase}
+.phead h2{margin:4px 0 0;font-size:18px;font-weight:600;color:var(--ink)}
+.phead .tags{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap}
+.pclose{position:absolute;top:14px;right:14px;width:30px;height:30px;border:1px solid var(--line2);background:#fff;border-radius:7px;cursor:pointer;font-size:17px;color:var(--muted);line-height:1}
+.pclose:hover{border-color:var(--b400);color:var(--b600)}
+.pbody{padding:6px 20px 30px;overflow:auto}
+.sec{padding:15px 0;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.sec h3{margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--b700);text-transform:uppercase}
+.sec p{margin:0;color:var(--ink)}
+.lead{font-size:14.5px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cols h4{margin:0 0 5px;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--muted);text-transform:uppercase}
+ul.li{margin:0;padding:0;list-style:none}
+ul.li li{position:relative;padding:3px 0 3px 15px;font-size:13px}
+ul.li li:before{content:"";position:absolute;left:0;top:10px;width:5px;height:5px;border-radius:50%;background:var(--b400)}
+.opt{border:1px solid var(--line2);border-radius:9px;padding:11px 12px;margin-bottom:9px;background:#fbfdff}
+.opt .ohd{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.otag{font-size:9.5px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:5px;text-transform:uppercase}
+.otag.a{background:#eef1f5;color:#52617a}.otag.b{background:var(--b50);color:var(--b700);border:1px solid var(--b200)}
+.opt .oname{font-size:12.5px;font-weight:600}
+.opt p{font-size:12.5px}
+.tools{margin-top:6px;display:flex;gap:5px;flex-wrap:wrap}
+.tool{font-size:10.5px;background:#eef1f5;color:#52617a;border:1px solid #dde4ee;padding:2px 7px;border-radius:5px}
+.rec{margin-top:6px;font-size:12px;color:var(--b700);font-weight:600}
+.rec:before{content:"\2713  "}
+.lockmsg{margin-top:6px;font-size:11.5px;color:#7a8aa0;font-style:italic}
+.contract{font-family:var(--mono);font-size:11.5px;background:var(--b900);color:#cfe0f6;border-radius:8px;padding:11px 12px;white-space:pre-wrap;word-break:break-word;line-height:1.55}
+.deps{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dep b{display:block;font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.3px;margin-bottom:4px;text-transform:uppercase}
+.dep span{display:inline-block;font-size:11.5px;background:var(--b50);color:var(--b700);border:1px solid var(--b200);padding:2px 8px;border-radius:6px;margin:0 4px 4px 0}
+.flowbar{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:50;width:min(720px,92vw);background:var(--b900);color:#fff;border-radius:14px;box-shadow:0 14px 40px rgba(12,44,82,.32);padding:14px 16px;display:none}
+.flowbar.show{display:block}
+.flowbar .fr{display:flex;align-items:center;gap:13px}
+.flowbar .ctl{width:38px;height:38px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font-size:17px;cursor:pointer;flex:none}
+.flowbar .ctl:hover{background:rgba(255,255,255,.18)}
+.flowbar .ctl:disabled{opacity:.3;cursor:default}
+.flowbar .fc{flex:1;min-width:0}
+.flowbar .fstep{font-size:10px;letter-spacing:.6px;color:#8fb4e2;text-transform:uppercase;font-weight:700}
+.flowbar .ftxt{font-size:14px;line-height:1.4;margin-top:2px}
+.flowbar .ftxt b{color:#bcd6f4}
+.prog{display:flex;gap:4px;margin-top:11px}
+.prog i{height:3px;flex:1;background:rgba(255,255,255,.16);border-radius:3px}
+.prog i.done{background:var(--b400)}.prog i.now{background:#fff}
+.scrim{position:fixed;inset:0;background:rgba(8,24,46,.42);z-index:55;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.show{opacity:1;pointer-events:auto}
+.legend{position:fixed;top:118px;right:14px;width:330px;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);z-index:58;padding:16px 18px;display:none}
+.legend.show{display:block}
+.legend h3{margin:0 0 4px;font-size:15px;font-weight:600}
+.legend p.s{margin:0 0 12px;font-size:12px;color:var(--muted)}
+.lrow{display:flex;align-items:center;gap:11px;padding:7px 0;border-top:1px solid var(--line)}
+.lrow:first-of-type{border-top:0}
+.lrow .sw{flex:none;width:40px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
+.lrow .lt{font-size:12.5px}.lrow .lt b{display:block;font-weight:600}.lrow .lt span{color:var(--muted);font-size:11.5px}
+.legend .close{margin-top:13px;width:100%;border:1px solid var(--line2);background:var(--b50);color:var(--b700);font-weight:600;border-radius:8px;padding:8px;cursor:pointer}
+.tour{position:fixed;z-index:62;width:300px;background:var(--paper);border-radius:12px;box-shadow:0 16px 44px rgba(12,44,82,.3);padding:16px 17px;display:none}
+.tour.show{display:block}
+.tour .tn{font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--b600);text-transform:uppercase}
+.tour h4{margin:5px 0 6px;font-size:15px;font-weight:600}
+.tour p{margin:0;font-size:13px}
+.tour .ta{display:flex;justify-content:space-between;align-items:center;margin-top:13px}
+.tour .ta .dots{display:flex;gap:5px}.tour .ta .dots i{width:6px;height:6px;border-radius:50%;background:var(--line2)}
+.tour .ta .dots i.on{background:var(--b500)}
+.tour .ta button{border:0;background:var(--b600);color:#fff;font-weight:600;font-size:12.5px;padding:7px 15px;border-radius:8px;cursor:pointer}
+.tour .ta .skip{background:transparent;color:var(--muted);padding:7px 4px}
+.spot{position:fixed;z-index:60;border-radius:12px;box-shadow:0 0 0 9999px rgba(8,24,46,.5);pointer-events:none;display:none;transition:all .25s}
+.spot.show{display:block}
+@media(max-width:760px){.panel{width:100%}.brand span{display:none}.strip{flex-wrap:wrap}}
+</style>
+<style>
+.example{font-size:12.5px;line-height:1.55;background:#fbfdff;border:1px solid var(--line2);border-radius:8px;padding:11px 13px;box-shadow:inset 3px 0 0 var(--b500)}
+.example b{color:var(--b700)}
+.deeppage{position:absolute;inset:0;top:106px;overflow:auto;background:var(--bg);padding:30px 22px 90px}
+.dpintro{max-width:900px;margin:0 auto 24px}
+.dpintro h2{margin:0 0 6px;font-size:22px;font-weight:600}
+.dpintro p{margin:0;color:var(--muted);font-size:14.5px;max-width:700px}
+.dcard{max-width:900px;margin:0 auto 20px;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:22px 24px;display:grid;grid-template-columns:1.05fr .95fr;gap:26px;align-items:center;position:relative}
+.dcard .dnum{position:absolute;top:-13px;left:22px;width:28px;height:28px;border-radius:8px;background:var(--b900);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.deyebrow{font-size:10px;font-weight:700;letter-spacing:.7px;color:var(--b600);text-transform:uppercase}
+.dcard h3{margin:5px 0 9px;font-size:18px;font-weight:600}
+.dcard .dtext>p{margin:0 0 11px;font-size:14px;line-height:1.6}
+.dcard .dtext ul.li li{font-size:12.5px}
+.dviz{background:var(--b50);border:1px solid var(--line);border-radius:12px;padding:14px}
+.dviz svg{width:100%;height:auto;display:block}
+.dviz .vt{font-size:11px;fill:var(--ink)}
+.dviz .vm{font-size:10px;fill:var(--muted)}
+.dviz .vw{font-size:11px;fill:#fff;font-weight:700}
+.wbtns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.wbtn{font-size:12px;padding:6px 11px;border:1px solid var(--b300);background:var(--paper);color:var(--b700);border-radius:8px;cursor:pointer}
+.wbtn.on{background:var(--b600);color:#fff;border-color:var(--b700)}
+.wout{font-size:13px}
+.wrow{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.wrow:first-child{border-top:0}
+.wrow .k{color:var(--muted)}.wrow .v{font-weight:600;text-align:right}
+.wbar{height:9px;border-radius:6px;background:var(--b100);overflow:hidden;margin:2px 0 4px}
+.wbar i{display:block;height:100%;background:var(--b500)}
+.wslider{width:100%;margin:8px 0}
+.wstat{display:flex;gap:10px;margin-top:10px}
+.wstat .b{flex:1;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.wstat .b b{display:block;font-size:24px;color:var(--b700)}
+.wstat .b span{font-size:11px;color:var(--muted)}
+.wmail{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;line-height:1.6}
+.wmail .slot{background:var(--b100);color:var(--b800);border-radius:4px;padding:1px 5px;font-weight:600}
+.wgrid{display:grid;grid-template-columns:auto repeat(3,1fr);gap:5px;font-size:11px}
+.wgrid .hd{font-weight:600;color:var(--muted);text-align:center;padding:4px 0}
+.wgrid .rl{font-weight:600;color:var(--ink);display:flex;align-items:center;padding-right:6px}
+.wcell{background:var(--paper);border:1px solid var(--line);border-radius:6px;min-height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;flex-wrap:wrap;padding:4px}
+.wcell:hover{border-color:var(--b500)}
+.wcell.on{outline:2px solid var(--b500);outline-offset:-2px}
+.wcell .dot{width:8px;height:8px;border-radius:50%;background:var(--b500)}
+.wcell.gap{border-style:dashed;border-color:var(--b400);background:var(--b50)}
+.wcell.gap span{font-size:10px;color:var(--b700)}
+.wdetail{margin-top:10px;font-size:12.5px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.wtog{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:12.5px}
+.wtog:first-child{border-top:0}
+.wpill{font-size:11px;border:1px solid var(--b300);border-radius:14px;padding:3px 11px;cursor:pointer;background:var(--paper);color:var(--b700)}
+.wpill.on{background:var(--b600);color:#fff;border-color:var(--b700)}
+.wseg{display:inline-flex;border:1px solid var(--b300);border-radius:8px;overflow:hidden}
+.wseg button{border:0;background:var(--paper);color:var(--b700);font-size:11px;padding:4px 9px;cursor:pointer}
+.wseg button.on{background:var(--b600);color:#fff}
+.wresult{margin-top:12px;border-radius:10px;padding:12px;text-align:center;font-weight:600}
+.wresult.yes{background:var(--b600);color:#fff}
+.wresult.no{background:var(--b50);color:var(--b700);border:1px dashed var(--b300)}
+@media(max-width:760px){.dcard{grid-template-columns:1fr;gap:16px}}
+</style>
+</head>
+<body>
+<h1 class="sr">Ascent lead-nurture engine — interactive system map and lead flow</h1>
+<div class="top">
+  <div class="brand"><b>Ascent</b><span>lead-nurture engine&nbsp;·&nbsp;assistant: Atlas</span></div>
+  <div class="spacer"></div>
+  <div class="seg" role="tablist" aria-label="View">
+    <button id="mMap" class="on" onclick="setMode('map')">System map</button>
+    <button id="mFlow" onclick="setMode('flow')">Lead flow</button>
+    <button id="mDeep" onclick="setMode('deep')">How it works</button>
+  </div>
+  <div class="phase"><span class="lab">Phase</span>
+    <div class="toggle">
+      <button id="pA" class="on" onclick="setPhase('A')" title="Rent the pipes">A</button>
+      <button id="pB" onclick="setPhase('B')" title="Full in-house">B</button>
+    </div>
+  </div>
+  <button class="tbtn" onclick="toggleLegend()">Legend</button>
+  <button class="tbtn" onclick="startTour()">Start here</button>
+</div>
+<div class="strip">
+  <span id="ctx"><b>System map.</b> Click any box to open it. Click any line to see what data moves.</span>
+  <span class="chip" id="phaseChip">Phase A · own the brain, rent the pipes</span>
+  <div class="zoom">
+    <button onclick="zoom(-1)" aria-label="Zoom out">&minus;</button>
+    <button onclick="zoom(0)" aria-label="Fit" title="Fit">&#9633;</button>
+    <button onclick="zoom(1)" aria-label="Zoom in">+</button>
+  </div>
+</div>
+<div class="wrap" id="wrap"><div id="stage"><div id="canvas">
+  <svg id="edges"><defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M2 1.5L8 5L2 8.5" fill="none" stroke="context-stroke" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker></defs>
+  </svg>
+</div></div></div>
+<div id="deep" class="deeppage" hidden></div>
+<div class="flowbar" id="flowbar" role="region" aria-label="Lead flow walkthrough">
+  <div class="fr">
+    <button class="ctl" id="fprev" onclick="flowStep(-1)" aria-label="Previous">&#8592;</button>
+    <button class="ctl" id="fplay" onclick="flowPlay()" aria-label="Play">&#9654;</button>
+    <div class="fc"><div class="fstep" id="fstep">Step 1 of 14</div><div class="ftxt" id="ftxt"></div></div>
+    <button class="ctl" id="fnext" onclick="flowStep(1)" aria-label="Next">&#8594;</button>
+  </div>
+  <div class="prog" id="fprog"></div>
+</div>
+<div class="scrim" id="scrim" onclick="closeAll()"></div>
+<aside class="panel" id="panel" role="dialog" aria-label="Component detail">
+  <div class="phead">
+    <div class="pl" id="panLayer"></div>
+    <h2 id="panTitle"></h2>
+    <div class="tags" id="panTags"></div>
+    <button class="pclose" onclick="closePanel()" aria-label="Close">&times;</button>
+  </div>
+  <div class="pbody" id="panBody"></div>
+</aside>
+<div class="legend" id="legend" role="dialog" aria-label="Legend">
+  <h3>How to read the map</h3><p class="s">The visual language of the engine.</p>
+  <div class="lrow"><span class="sw" style="background:var(--b600);border:1.5px solid var(--b700)"></span><span class="lt"><b>Brain (filled)</b><span>Native intelligence — our IP</span></span></div>
+  <div class="lrow"><span class="sw" style="background:#fff;border:1.5px solid var(--b400)"></span><span class="lt"><b>Pipe (light)</b><span>Commodity execution</span></span></div>
+  <div class="lrow"><span class="sw" style="background:#fff;border:1.5px solid var(--b500);color:var(--b600)">B</span><span class="lt"><b>Solid border = built</b><span>Made in-house</span></span></div>
+  <div class="lrow"><span class="sw" style="background:#fff;border:1.5px dashed var(--b300);color:var(--b600)">I</span><span class="lt"><b>Dashed border = integrated</b><span>Third-party via API</span></span></div>
+  <div class="lrow"><span class="sw" style="background:var(--b50);border:1px solid var(--b200);color:var(--b700)">AI</span><span class="lt"><b>AI vs rule</b><span>Badge shows the decision type</span></span></div>
+  <div class="lrow"><span class="sw" style="background:var(--b900);color:#fff">&#10003;</span><span class="lt"><b>Human in the loop</b><span>4 points where a person stays in control</span></span></div>
+  <div class="lrow"><span class="sw" style="background:var(--b800);border:1.5px solid var(--b900)"></span><span class="lt"><b>Central record</b><span>Single source of truth (the spine)</span></span></div>
+  <button class="close" onclick="toggleLegend()">Close</button>
+</div>
+<div class="spot" id="spot"></div>
+<div class="tour" id="tour" role="dialog" aria-label="Guided tour">
+  <div class="tn" id="tourN">Tour</div><h4 id="tourH"></h4><p id="tourP"></p>
+  <div class="ta"><button class="skip" onclick="endTour()">Skip</button><div class="dots" id="tourDots"></div><button id="tourBtn" onclick="tourNext()">Next</button></div>
+</div>
+<script>
+const NODES = {
+ L0:{x:40,y:30,w:200,h:64,cls:"ext",lyr:"Inputs",title:"Sources",sub:"Ranked by intent: in-person > cold",ai:"Source",
+   purpose:"Where every lead originates - including your own CRM database. Each lead arrives stamped with where it came from and a starting priority: an in-person roundtable outranks a webinar, which outranks a cold list. That stamp shapes how soon and how warmly we reach out.",
+   inputs:["Webinars, roundtables, conferences","Form fills and gated-content downloads","CRM, partner lists, cold lists"],
+   outputs:["Raw lead records, each tagged with its origin and a base intent weight"],
+   logic:"Rule. A fixed priority table ranks sources (in-person roundtable beats webinar beats download beats cold list). No AI needed to know a source's weight.",
+   a:{name:"Pull from source systems",desc:"Connect event platforms and CRM so leads arrive automatically.",tools:["Event platforms","CRM exports","Partner feeds"]},
+   b:{name:"Native intake",desc:"Own forms and capture surfaces feeding the engine directly."},
+   bA:"ext",bB:"ext",rec:"Phase A: integrate the source systems you already use",
+   open:["Source-priority schema: exact weights, and how origin maps to the opening line of a message"],
+   up:["CRM (existing contacts)"],down:["Ingestion"],
+   example:"Priya scans her badge at the roundtable. Ascent receives her name, work email and company, stamped <b>source: roundtable, priority 5</b> (its highest).",
+   contract:"lead {\n  source_type, source_id,\n  captured_at,\n  raw_fields { ... },\n  base_intent_weight\n}"},
+ L1:{x:40,y:130,w:160,h:66,cls:"",lyr:"Intake",title:"Ingestion",sub:"Clean up every lead",ai:"Rule",
+   purpose:"The front door. Cleans and standardises every incoming lead so everything downstream can trust the data.",
+   inputs:["Raw lead records (CSV/Excel uploads, API pulls)"],
+   outputs:["Clean, de-duplicated, normalised records with a source-priority score"],
+   logic:"Rule. Deterministic cleaning — dedupe, format emails and phones, validate, tag origin, assign source priority. AI can be added later for fuzzy company-name matching.",
+   a:{name:"Connectors",desc:"Use managed connectors to event platforms and the CRM.",tools:["CRM APIs","Event-platform APIs","Managed connectors"]},
+   b:{name:"Native intake framework",desc:"Own the upload and connector layer for full control of the data."},
+   bA:"integrated",bB:"built",rec:"Phase A: integrate · Phase B: bring connectors in-house for control",
+   open:["Cadence: large batches every 3-4 months plus a continuous trickle","Identity strategy lives next door — see Identity resolution"],
+   up:["Sources"],down:["Identity resolution"],
+   example:"Her email arrives as <b>\u2018 Priya N. &lt;PRIYA.NAIR@Acme-Logistics.COM &gt;\u2019</b>. Ingestion trims the spaces, fixes the casing, validates it, and discards the duplicate row someone uploaded twice. <b>It does not look anyone up</b> - it just makes the data trustworthy.",
+   contract:"normalised_lead {\n  lead_id (temp), email, phone,\n  company_raw, source_type,\n  source_priority, captured_at\n}"},
+ IDR:{x:235,y:130,w:160,h:66,cls:"brain",lyr:"New · intake",title:"Identity resolution",sub:"One person, one record",ai:"AI + rule",
+   purpose:"Makes sure one person is one record — and links each person to their company — even when they show up across email, LinkedIn, WhatsApp and the platform.",
+   inputs:["Normalised leads","Existing spine records","Events keyed by different identifiers"],
+   outputs:["A single canonical contact for each person; a contact-to-account link"],
+   logic:"AI + rule. Exact matching on email and domain first; AI matching on name, company and title similarity for the ambiguous cases, each with a confidence score. High confidence auto-merges; the rest waits for review.",
+   a:{name:"Resolution service",desc:"Use a customer-data platform or dedupe service.",tools:["CDP (Segment, RudderStack)","Dedupe services"]},
+   b:{name:"Native matching",desc:"Resolve on the spine itself. Recommended — it underpins data quality and every score."},
+   bA:"built",bB:"built",rec:"Phase A: build — scoring is only as good as identity",
+   open:["Confidence threshold for auto-merge vs human review","How merges and splits preserve event history"],
+   up:["Ingestion","Event tracker"],down:["Enrichment","Data spine"],
+   example:"That clean record is matched to a person already in the system - the same Priya who opened two emails last quarter under a personal address. The two become <b>one contact</b>, linked to the Acme Logistics <b>account</b>. (Ingestion cleaned the row; this step decides <b>who the row is</b>.)",
+   contract:"resolved_contact {\n  contact_id, account_id,\n  merged_from [ ... ],\n  match_confidence\n}"},
+ L2:{x:430,y:130,w:160,h:66,cls:"",lyr:"Enrich",title:"Enrichment",sub:"Fill in the details",ai:"Rule",
+   purpose:"Fills in who the person is and where they work — title, seniority, function, industry, company size, region — so they can be bucketed accurately.",
+   inputs:["Resolved contact (email, name, company)"],
+   outputs:["Firmographic and role attributes appended to contact and account"],
+   logic:"Rule-driven calls to data providers. AI optional to reconcile conflicting provider data or read seniority out of a messy job title.",
+   a:{name:"Data provider",desc:"Append firmographics from a commodity provider.",tools:["Apollo","ZoomInfo","Clearbit","LinkedIn data"]},
+   b:{name:"Internal enrichment",desc:"Build from owned data plus scraping. Note: cost and terms-of-service caveats."},
+   bA:"integrated",bB:"built",rec:"Phase A: integrate (commodity) · Phase B candidate for data ownership",
+   open:["Provider choice and cost per match","Target match rate and the fallback when there is no match"],
+   up:["Identity resolution"],down:["Persona engine","Data spine"],
+   example:"From just her email and company, Ascent <b>appends new facts</b> it did not have: Head of Data Engineering \u00b7 senior \u00b7 Data function \u00b7 Logistics \u00b7 5,000+ staff \u00b7 India. (Identity found the person; this step fills in <b>who they are</b>.)",
+   contract:"enrichment {\n  title, seniority_tier, function,\n  industry, company_size, region,\n  provider, match_score\n}"},
+ L3:{x:625,y:130,w:160,h:66,cls:"brain",gate:true,lyr:"Understand",title:"Persona engine",sub:"Sort into buckets",ai:"AI",
+   purpose:"Sorts each lead into a who-are-they bucket — role family by seniority, with industry optional — so messaging can be tuned to them.",
+   inputs:["Enriched contact attributes"],
+   outputs:["Persona label, seniority tier, confidence; proposed sub-buckets"],
+   logic:"AI assigns the persona with a confidence score. A person approves the taxonomy and any new sub-buckets — one of the four human-in-the-loop checks. High-confidence assignments pass automatically; only low-confidence ones go to review, so the gate never becomes the bottleneck.",
+   a:{name:"External classifier",desc:"Use a managed text-classification API.",tools:["Classification APIs"]},
+   b:{name:"Native on Topaz",desc:"Build on Infosys Topaz. Recommended — persona logic is core IP."},
+   bA:"built",bB:"built",rec:"Phase A: build (brain)",
+   open:["How many personas, how deep — start at the 4 proven, split only when distinct content and message exist","Confidence threshold for auto-approve vs review"],
+   up:["Enrichment"],down:["Content engine","Data spine"],
+   example:"Those facts resolve to the bucket <b>AI &amp; Data \u00b7 senior leader</b> with <b>0.92 confidence</b> - high enough to pass automatically. A 0.55 would have gone to a person to confirm. (Enrichment listed attributes; this step <b>classifies</b> them into a bucket.)",
+   contract:"persona {\n  persona_id, role_family,\n  seniority_tier, industry?,\n  confidence, assigned_by\n}"},
+ L4:{x:820,y:130,w:160,h:66,cls:"brain",gate:true,lyr:"Understand",title:"Content engine",sub:"Match the right asset",ai:"AI",
+   purpose:"Knows the whole CRL content library and matches the right asset to the right persona at the right funnel stage — and flags where content is missing.",
+   inputs:["Vectorised content library","Persona and funnel stage","Source context (what they attended or downloaded)"],
+   outputs:["Ranked content per persona and stage","A content-gap report","Optionally, AI-drafted or repurposed assets"],
+   logic:"AI maps content to persona and stage using embeddings, and re-maps as new content lands. A person reviews the mapping (human-in-the-loop check). Topaz can draft or repurpose assets to fill gaps — closing the Digital & CX blind spot.",
+   a:{name:"Managed vector store",desc:"Use a managed vector database for storage and search.",tools:["Azure AI Search","Pinecone"]},
+   b:{name:"Native mapping",desc:"Build the mapping logic and store. Recommended — vector infra itself can be managed."},
+   bA:"built",bB:"built",rec:"Phase A: build the logic; vector infra can be rented",
+   open:["Embedding model and how often to refresh as content lands","How aggressively to auto-generate vs human-author (esp. Digital & CX)"],
+   up:["Persona engine"],down:["Data spine","Orchestration"],
+   example:"For that bucket at the awareness stage, the top match is a <b>logistics-AI case study</b>. The engine also notices there is <b>no decision-stage asset for Digital &amp; CX</b> and flags the gap to fill.",
+   contract:"content_map {\n  persona_id, stage,\n  asset_id, score,\n  source_hook?, gaps [ ... ]\n}"},
+ SPINE:{x:40,y:270,w:940,h:74,cls:"spine",lyr:"The centre",title:"Data spine — central record",sub:"contacts · accounts · events · scores · content · consent — one linked record",ai:"Store",
+   purpose:"The single source of truth. Every other component reads from and writes to it. Drawing the engine around this hub — rather than as a one-way conveyor belt — is what keeps every score, message and hand-off consistent.",
+   inputs:["Resolved contacts","Enrichment, persona, content map","Events, scores, consent, CRM outcomes"],
+   outputs:["One consistent, queryable record that every node relies on"],
+   logic:"Store and data model. Not AI — it is the schema and storage that make everything else coherent.",
+   a:{name:"—",desc:"Not a rent-vs-build choice. The data model is foundational and owned."},
+   b:{name:"Native",desc:"Build it. The model and its linkages are core IP."},
+   bA:"built",bB:"built",rec:"Phase A: build — this is the foundation; spec it first",
+   open:["Core schema: contact to account to events to scores to content to consent","Event-history retention, and how merges/splits keep it","Data residency (India DPDP, EU GDPR)"],
+   up:["Every write path"],down:["Every read path"],
+   contract:"contact <-> account\n   <-> events <-> scores\n   <-> content_map <-> consent\n( one linked record graph )"},
+ ELIG:{x:70,y:400,w:180,h:66,cls:"",lyr:"New · before send",title:"Eligibility check",sub:"Should we contact them?",ai:"Rule",
+   purpose:"The should-we-even-contact-them check before any outreach — protecting the list and keeping the engine compliant.",
+   inputs:["Contact and consent state","CRM ownership / open-opportunity status","Customer status, suppression lists, fatigue signals"],
+   outputs:["An eligible audience for orchestration — or a route to exit/suppress"],
+   logic:"Rule. Hard filters: opted in? not already a customer? not already owned by sales? not over-contacted? Anything that fails is suppressed or held.",
+   a:{name:"—",desc:"Built on the spine and consent state; not a third-party concern."},
+   b:{name:"Native",desc:"Build it — depends entirely on your own spine and consent records."},
+   bA:"built",bB:"built",rec:"Phase A: build",
+   open:["Fatigue thresholds — how much contact is too much","How to coordinate with sales-owned records to avoid double-touching"],
+   up:["Data spine"],down:["Orchestration","Exit / suppress"],
+   contract:"eligibility {\n  contact_id, eligible,\n  reasons [ ... ], holds [ ... ]\n}"},
+ EXIT:{x:300,y:400,w:150,h:66,cls:"term",lyr:"Exit path",title:"Suppress / hold",sub:"Held or removed",ai:"Rule",
+   purpose:"Where ineligible or opted-out leads go — held, suppressed, or routed to a different motion such as existing-customer expansion. The skeleton is not a one-way street.",
+   inputs:["Ineligible contacts from Eligibility"],
+   outputs:["A suppression record on the spine; optional re-entry when status changes"],
+   logic:"Rule. A holding state with explicit re-entry conditions.",
+   a:{name:"—",desc:"Internal state."},b:{name:"Native",desc:"Part of the eligibility logic."},
+   bA:"built",bB:"built",rec:"Phase A: build",
+   open:["Re-entry rules: what change brings a suppressed lead back into play"],
+   up:["Eligibility"],down:["Data spine"],
+   contract:"suppression {\n  contact_id, reason,\n  until?, re_entry_rule\n}"},
+ L5:{x:185,y:510,w:210,h:76,cls:"brain",lyr:"Decide",title:"Orchestration",sub:"Decide the next move",ai:"AI + rule",
+   purpose:"The brain. For each eligible person it decides the next best action — which content, which channel, what cadence, and when — and runs the weekly double-down-on-what-works loop.",
+   inputs:["Eligible contacts","Persona and content map","Engagement and BANT scores","Past actions and how the person responded"],
+   outputs:["A per-contact action plan (channel, asset, timing) and a personalised destination view"],
+   logic:"AI + rule. Rules guardrail cadence, a global frequency cap and channel order; the decisioning layer picks the next best action by predicted lift — rules-first in v1, predictive once outcome data accrues.",
+   a:{name:"—",desc:"Not a buy decision — this is the differentiator."},
+   b:{name:"Native",desc:"Build it. Sequencing and decisioning are the heart of the engine."},
+   bA:"built",bB:"built",rec:"Phase A: build (brain)",
+   open:["Sequencing logic and the cross-channel frequency cap","Rules-first vs predictive — when to switch the model on","How experiments and holdouts get scheduled"],
+   up:["Eligibility","Data spine"],down:["Channels"],
+   example:"Because Priya came from a roundtable (<b>priority 5</b>), her first touch is scheduled <b>within a day</b>: an email opening with the roundtable hook, linking to the case study, with a LinkedIn touch queued as follow-up. A cold-list lead would get a slower, lighter sequence.",
+   contract:"action_plan {\n  contact_id,\n  steps [{ channel, asset_id, send_at }],\n  destination_view\n}"},
+ L6:{cluster:true,x:40,y:640,w:500,h:152,lyr:"L6",title:"Channels",
+   purpose:"Where messages actually go out. Pluggable engines: the brain decides, these deliver. The platform is built and owned; the rest are integrated best-of-breed pipes.",
+   children:["CH_EMAIL","CH_PLAT","CH_LI","CH_WA"]},
+ CH_EMAIL:{chip:true,parent:"L6",cls:"",title:"Email",sub:"Deliver at scale",ai:"Rule",lyr:"L6 · channel",
+   purpose:"Delivers email at scale with good deliverability. The brain composes the message; this engine sends and reports back.",
+   inputs:["Action plan steps for email"],outputs:["Delivery, open, click and bounce events"],
+   logic:"Rule (delivery). Sending and deliverability are a solved, specialised problem.",
+   a:{name:"Email service",desc:"Use a deliverability-grade sending service.",tools:["SendGrid","Amazon SES","Marketo"]},
+   b:{name:"Own send infra",desc:"Rarely worth it — reputation and deliverability are hard to own."},
+   bA:"integrated",bB:"integrated",lockB:"Stays integrated: deliverability and sender reputation are specialised.",
+   rec:"Integrate — deliverability is hard to own well",
+   open:["Domain warmup, bounce and complaint handling, list hygiene"],
+   up:["Orchestration"],down:["Event tracker"],
+   contract:"send { contact_id, template, asset_id }\n  -> events { delivered, open, click, bounce }"},
+ CH_PLAT:{chip:true,parent:"L6",cls:"brainchip",title:"Platform + Atlas",sub:"Personalised landing page",ai:"AI",lyr:"L6 · channel",
+   purpose:"The personalised landing page each lead lands on — and the home of Atlas, the assistant. This delivers the second level of personalisation: not just the message, but the destination, tailored to persona and person.",
+   inputs:["Action plan + destination view","Persona, content map, journey"],
+   outputs:["Visit, time-on-page, Atlas transcript and CTA events"],
+   logic:"AI. Renders a persona- and person-tailored view; Atlas answers, qualifies in conversation, and can book a meeting.",
+   a:{name:"—",desc:"This is the owned experience."},
+   b:{name:"Native",desc:"Build it. The platform and Atlas are core IP and the centrepiece."},
+   bA:"built",bB:"built",rec:"Phase A: build (brain)",
+   open:["How far Atlas qualifies and books vs hands to a human"],
+   up:["Orchestration"],down:["Event tracker"],
+   contract:"visit { contact_id, view_id, time_on_page,\n  atlas_transcript, ctas [ ... ] }"},
+ CH_LI:{chip:true,parent:"L6",cls:"",title:"LinkedIn",sub:"New vs the pilot",ai:"Rule",lyr:"L6 · channel",
+   purpose:"Adds a professional-network touch the pilot never used. Powerful, but it carries platform terms-of-service risk that has to be respected.",
+   inputs:["Action plan steps for LinkedIn"],outputs:["Connection, message and reply events"],
+   logic:"Rule (automation), used with caution under LinkedIn's terms.",
+   a:{name:"LinkedIn tooling",desc:"Integrate carefully, watching ToS.",tools:["Sales Navigator API","Dripify","Phantombuster"]},
+   b:{name:"Own automation",desc:"Cannot be fully owned — LinkedIn's terms forbid it."},
+   bA:"integrated",bB:"integrated",lockB:"Cannot be fully owned: LinkedIn terms of service.",
+   rec:"Integrate, with ToS caution",
+   open:["Where the line sits between safe automation and ToS risk"],
+   up:["Orchestration"],down:["Event tracker"],
+   contract:"li_action { contact_id, type }\n  -> events { accepted, replied }"},
+ CH_WA:{chip:true,parent:"L6",cls:"",title:"WhatsApp",sub:"Optional · opt-in",ai:"Rule",lyr:"L6 · channel",
+   purpose:"Optional and opt-in only — a high-engagement channel where it is appropriate and consented.",
+   inputs:["Action plan steps for WhatsApp (opt-in required)"],outputs:["Delivered, read and reply events"],
+   logic:"Rule (templated), with opt-in strictly enforced.",
+   a:{name:"Approved provider",desc:"Use a Meta-approved business solution provider.",tools:["Twilio","WATI","Gupshup"]},
+   b:{name:"Own it",desc:"Legally must run through an approved provider (BSP)."},
+   bA:"integrated",bB:"integrated",lockB:"Legally must use a Meta-approved provider (BSP).",
+   rec:"Integrate (opt-in only)",
+   open:["Opt-in capture and proof; template approval"],
+   up:["Orchestration"],down:["Event tracker"],
+   contract:"wa_message { contact_id, template_id, opt_in:true }\n  -> events { delivered, read, reply }"},
+ L7:{x:190,y:830,w:200,h:66,cls:"",lyr:"Sense",title:"Activity tracking",sub:"Every open, click, visit",ai:"Rule",
+   purpose:"Captures everything everyone does — opens, clicks, visits, time on platform, downloads, LinkedIn actions, WhatsApp replies, callback requests — into one running activity log, all keyed to the right person and account.",
+   inputs:["Events from every channel"],
+   outputs:["A unified, timestamped event stream written to the spine — the raw material for scoring"],
+   logic:"Rule (collection and keying). The single source of truth for behaviour. No AI needed to record it; identity resolution is what makes sure each action is attached to the right person.",
+   a:{name:"Analytics infra",desc:"Use event/analytics infrastructure.",tools:["Product analytics","Webhook ingestion"]},
+   b:{name:"Native store",desc:"Build it. Recommended — it is the source of truth for behaviour."},
+   bA:"built",bB:"built",rec:"Phase A: build · Phase B can pull more in-house",
+   open:["Event taxonomy and dedupe of repeated events","How real-time scoring needs to be"],
+   up:["Channels"],down:["Data spine"],
+   contract:"activity {\n  contact_id, account_id,\n  type, channel, value, ts\n}"},
+ L8:{x:640,y:400,w:190,h:66,cls:"brain",gate:true,lyr:"Decide",title:"Scoring & qualification",sub:"Warm? Real?",ai:"AI",
+   purpose:"Answers two questions: how warm is the person (engagement score from behaviour) and how real is the opportunity (BANT on the account). It then combines them into a sales-ready flag and a priority rank.",
+   inputs:["Event stream (the person)","Account research and signals (BANT)"],
+   outputs:["Engagement score, BANT index, a combined sales-ready flag and priority"],
+   logic:"AI. Engagement is weighted, capped and time-decayed signals — kept explainable. BANT is AI research plus signals, verified by a person (human-in-the-loop check). All weights and thresholds are tunable by the feedback loop.",
+   a:{name:"—",desc:"This is the core IP."},
+   b:{name:"Native",desc:"Build it. The two-lens scoring model is the engine's signature asset."},
+   bA:"built",bB:"built",rec:"Phase A: build (IP)",
+   open:["Exact engagement weights, caps and decay","Combination rule and the sales-ready threshold","Add a predictive propensity score alongside the explainable one?"],
+   up:["Data spine"],down:["Hand-off","Orchestration"],
+   contract:"scores {\n  contact_id, engagement,\n  account_id, bant { b,a,n,t, verified_by },\n  sales_ready, priority\n}"},
+ L9:{x:625,y:520,w:230,h:76,cls:"",gate:true,lyr:"Hand off",title:"Hand-off & analytics",sub:"Pass to sales + reporting",ai:"AI + rule",
+   purpose:"Hands sales-ready, fully-contextualised leads to sales with their whole journey — and is the live reporting layer for the entire engine. Not-ready leads recycle back to nurture rather than being dropped.",
+   inputs:["Sales-ready leads with scores and journey","All engine activity, for reporting"],
+   outputs:["Scored, contextual leads pushed to the CRM (human-in-the-loop check at hand-off)","Live dashboards; a recycle path for not-ready leads"],
+   logic:"Mixed. Analytics are native and built; the CRM push is integrated. A person signs off each hand-off (human-in-the-loop check); leads judged not-ready recycle to orchestration.",
+   a:{name:"CRM integration",desc:"Push to the sales system of record.",tools:["Salesforce","Microsoft Dynamics"]},
+   b:{name:"Native analytics",desc:"Build the analytics; integrate the CRM. The pilot's dashboard becomes this live layer."},
+   bA:"built",bB:"built",rec:"Phase A: build analytics, integrate the CRM",
+   open:["What context sales actually wants in the hand-off payload","Recycle rules: when does not-ready come back, and to where"],
+   up:["Scoring & qualification"],down:["CRM","Data spine"],
+   contract:"handoff {\n  contact_id, account_id,\n  scores, journey [ ... ],\n  owner, status\n}  -> CRM"},
+ CRM:{x:650,y:650,w:180,h:60,cls:"ext",lyr:"Linked system",title:"CRM",sub:"Source + destination",ai:"External",
+   purpose:"Your sales database, linked to Ascent both ways. Existing CRM contacts feed the pipeline as a source; qualified leads are pushed back in with their full story; and won or lost outcomes flow back to teach the engine.",
+   inputs:["The hand-off payload"],
+   outputs:["A deal outcome that loops back to the spine to teach the engine"],
+   logic:"External system, integrated by API. The outcome loop is what makes the engine learn from revenue, not just clicks.",
+   a:{name:"Integrate",desc:"Connect the existing sales CRM.",tools:["Salesforce","Dynamics"]},
+   b:{name:"—",desc:"External — sales' own system of record, not built in-house."},
+   bA:"ext",bB:"ext",lockB:"External system of record for sales.",rec:"Integrate",
+   open:["Field mapping for clean two-way sync of outcomes"],
+   up:["Hand-off & analytics"],down:["Sources","Data spine"],
+   contract:"outcome {\n  contact_id, account_id, stage,\n  won, value, closed_at\n}"},
+ ATLAS:{chip:true,parent:"XC",cls:"brainchip",title:"Atlas",sub:"The assistant",ai:"AI",lyr:"Cross-cutting",
+   touches:["CH_PLAT","L4","L8","L5"],
+   purpose:"The persona-aware, content-grounded assistant. Externally it answers, qualifies and books on the platform. Internally it can help your own team — which accounts are heating up, draft a follow-up.",
+   inputs:["Persona, content map, the contact's journey"],
+   outputs:["Grounded answers, qualification signals, bookings"],
+   logic:"AI, grounded strictly in the real content library and the contact's context. It never invents; it points to actual assets.",
+   a:{name:"—",desc:"Owned experience."},b:{name:"Native",desc:"Build it (brain)."},
+   bA:"built",bB:"built",rec:"Phase A: build (brain)",
+   open:["External vs internal Atlas — both are worth doing"],
+   up:["Content engine, Scoring"],down:["Platform, Orchestration"],
+   contract:"grounded on { persona, content_map, journey }\n  -> { answers, qualification_signals, bookings }"},
+ FEEDBACK:{chip:true,parent:"XC",cls:"brainchip",title:"Feedback loop",sub:"Learns from outcomes",ai:"AI + rule",lyr:"Cross-cutting",
+   touches:["L7","L8","L4","L5","CRM"],
+   purpose:"The learning loop. Turns content performance, persona accuracy, scoring calibration and — most importantly — real CRM outcomes into tuning of weights, mappings and the taxonomy.",
+   inputs:["Content performance, persona accuracy","Score calibration, CRM outcomes"],
+   outputs:["Tuned weights, mappings and taxonomy; experiment results"],
+   logic:"AI plus analytics. It closes the loop: outcomes are the training labels, not just clicks. It runs experiments with holdouts so lift can be proven to leadership.",
+   a:{name:"—",desc:"Owned."},b:{name:"Native",desc:"Build it."},
+   bA:"built",bB:"built",rec:"Phase A: build",
+   open:["Experiment design and holdout strategy","How outcomes flow back as training labels"],
+   up:["Tracker, Scoring, CRM outcomes"],down:["Scoring, Content, Orchestration"],
+   contract:"signals { content_perf, persona_accuracy,\n  score_calibration, outcomes }  -> tuning"},
+ GOV:{chip:true,parent:"XC",cls:"",title:"Governance",sub:"Consent, compliance, sign-offs",ai:"Rule",lyr:"Cross-cutting",
+   touches:["CH_EMAIL","CH_LI","CH_WA","ELIG","L1","SPINE","L3","L8"],
+   purpose:"Responsible-AI, consent and per-channel, per-region compliance — plus the four human-in-the-loop checks. This is what keeps the engine legal and trustworthy.",
+   inputs:["Consent state, regional rules, channel policies"],
+   outputs:["Enforced consent and compliance; an audit trail of gate decisions"],
+   logic:"Rule and policy. Consent (India DPDP, EU GDPR), WhatsApp opt-in and BSP, LinkedIn ToS, explainable persona and score decisions, and the four sign-off checks.",
+   a:{name:"—",desc:"Policy layer."},b:{name:"Native",desc:"Build it."},
+   bA:"built",bB:"built",rec:"Phase A: build",
+   open:["Per-region consent model and data residency","A lead-facing preference centre (topic, frequency, channel)"],
+   up:["All channels, eligibility, spine"],down:["Enforced across the engine"],
+   contract:"consent { contact_id, channel, opt_in, basis, region }\n  + audit log of gate decisions"},
+ OBS:{chip:true,parent:"XC",cls:"",title:"Observability",sub:"Engine health",ai:"Rule",lyr:"Cross-cutting · new",
+   touches:["SPINE","L1","L2","L3","L8"],
+   purpose:"The engine's own health monitor — separate from the marketing dashboards. Are match rates, classification confidence, send success and score drift all healthy? Developers need this to catch silent degradation.",
+   inputs:["Operational metrics from every node"],
+   outputs:["Health dashboards and alerts for the build team"],
+   logic:"Rule plus metrics. Operational monitoring, distinct from the marketing analytics in Hand-off.",
+   a:{name:"Monitoring infra",desc:"Integrate standard observability tooling.",tools:["Metrics + alerting stack"]},
+   b:{name:"Native dashboards",desc:"Build light to start, grow over time."},
+   bA:"built",bB:"built",rec:"Phase A: build light, grow over time",
+   open:["Which signals matter most early (match rate, confidence, drift)"],
+   up:["All nodes (metrics)"],down:["Alerts to the build team"],
+   contract:"metrics { enrichment_match_rate,\n  persona_confidence_dist,\n  send_success, score_drift }"}
+};
+const EDGES = [
+ {f:"L0",t:"L1",r:"v",c:"New leads arrive from wherever they were captured.",d:"raw lead { name, email, company, source, captured_at }"},
+ {f:"L1",t:"IDR",r:"h",c:"Tidied-up records, ready to be matched to a real person.",d:"clean lead { email, phone, company, source_priority }"},
+ {f:"IDR",t:"L2",r:"h",c:"One confirmed person, ready to have their details filled in.",d:"contact { contact_id, account_id }"},
+ {f:"L2",t:"L3",r:"h",c:"Role and company details, so the person can be sorted.",d:"+ { title, seniority, function, industry, company_size, region }"},
+ {f:"L3",t:"L4",r:"h",c:"Their persona, so the right content can be chosen.",d:"persona { role_family, seniority_tier, confidence }"},
+ {f:"IDR",t:"SPINE",r:"v",c:"The confirmed person is saved to the central record.",d:"contact + account link  ->  central record"},
+ {f:"L4",t:"SPINE",r:"v",c:"The fully built profile is saved to the central record.",d:"profile { contact, enrichment, persona, content_map }"},
+ {f:"SPINE",t:"ELIG",r:"v",c:"The contact check reads the profile, consent and sales status.",d:"reads { contact, consent, crm_status, fatigue }"},
+ {f:"ELIG",t:"EXIT",r:"h",dash:true,c:"Anyone we should not contact is held or removed here.",d:"suppression { contact_id, reason, until }"},
+ {f:"ELIG",t:"L5",r:"v",c:"People we are cleared to contact move to the planner.",d:"eligible contact { contact_id }"},
+ {f:"L5",t:"L6",r:"v",c:"A plan for this person: which message, which channel, when.",d:"action_plan { steps [{ channel, asset, send_at }] }"},
+ {f:"L6",t:"L7",r:"v",c:"Whatever the person does becomes an activity event.",d:"activity { type, channel, value, ts }"},
+ {f:"L7",t:"SPINE",r:"laneL",lane:18,toY:298,label:"activity",c:"Every action is logged to the central record.",d:"activity  ->  central record (keyed to the person)"},
+ {f:"SPINE",t:"L8",r:"v",bidir:true,label:"reads / writes",c:"Scoring reads activity and the account, and writes scores back.",d:"reads { events, account }    writes { engagement, bant, sales_ready }"},
+ {f:"L8",t:"L9",r:"v",c:"People who are warm and real, ranked by priority.",d:"sales_ready contact { scores, priority }"},
+ {f:"L9",t:"CRM",r:"v",label:"push to CRM",c:"The lead is pushed into the sales CRM with its full story.",d:"handoff { contact, account, scores, journey, owner }  ->  CRM"},
+ {f:"CRM",t:"SPINE",r:"laneR",lane:1040,toY:300,label:"result from CRM",accent:true,c:"Won or lost comes back from the CRM and teaches the engine.",d:"outcome { stage, won, value, closed_at }  ->  central record"},
+ {f:"L9",t:"SPINE",r:"laneR",lane:1005,toY:326,label:"recycle",dash:true,c:"People who are not ready yet go back into nurture, not the bin.",d:"recycle { contact_id, reason: not_ready }"},
+ {f:"CRM",t:"L0",r:"loopTop",lane:1058,topY:18,label:"CRM is also a source",dash:true,c:"Your CRM database is also a starting point - existing contacts can be pulled into the pipeline to be re-engaged.",d:"existing contacts & accounts  ->  Sources"}
+];
+let PHASE="A", MODE="map";
+const cv=document.getElementById("canvas"), svg=document.getElementById("edges");
+function bstat(n){return PHASE==="A"?n.bA:n.bB;}
+function metaHTML(id){
+  const n=NODES[id], st=bstat(n);
+  const cls=n.ai==="Rule"?"rule":(n.ai==="Store"?"store":(n.ai==="Source"||n.ai==="External"?"rule":""));
+  let m='<span class="meta"><span class="pill '+cls+'">'+n.ai+'</span>';
+  if(st==="built")m+='<span class="bge built">Built</span>';
+  else if(st==="integrated")m+='<span class="bge">Integrated</span>';
+  else if(st==="ext")m+='<span class="bge locked">External</span>';
+  return m+'</span>';
+}
+function nodeCard(id){
+  const n=NODES[id], el=document.createElement("button");
+  el.className="node "+(n.cls||"")+(n.gate?" hasgate":"");el.style.left=n.x+"px";el.style.top=n.y+"px";
+  el.style.width=n.w+"px";el.style.height=n.h+"px";el.id="node_"+id;el.dataset.id=id;
+  el.onclick=(e)=>{e.stopPropagation();openNode(id);};
+  let h=n.gate?'<span class="gateTab">Human in the loop</span>':'';
+  if(n.lyr)h+='<span class="lyr">'+n.lyr+'</span>';
+  h+='<span class="ttl">'+n.title+'</span>';
+  if(n.sub)h+='<span class="sub">'+n.sub+'</span>';
+  el.innerHTML=h+metaHTML(id);
+  return el;
+}
+function chipCard(id,xc){
+  const n=NODES[id], b=document.createElement("button");
+  b.className="chip "+(n.cls||"");b.id="node_"+id;b.dataset.id=id;
+  b.onclick=(e)=>{e.stopPropagation();openNode(id);};
+  const cls=n.ai==="Rule"?"rule":"", st=bstat(n);
+  let meta='<div class="cm"><span class="pill '+cls+'">'+n.ai+'</span>';
+  if(st==="built")meta+='<span class="bge built">Built</span>';
+  else if(st==="integrated")meta+='<span class="bge">Integrated</span>';
+  meta+='</div>';
+  b.innerHTML='<div class="ct">'+n.title+'</div><div class="cs">'+n.sub+'</div>'+meta;
+  if(xc&&n.touches){b.onmouseenter=()=>hltouch(n.touches,true);b.onmouseleave=()=>hltouch(n.touches,false);}
+  return b;
+}
+function renderNodes(){
+  cv.querySelectorAll(".node,.cluster").forEach(e=>e.remove());
+  for(const id in NODES){const n=NODES[id];if(n.chip||n.cluster)continue;cv.appendChild(nodeCard(id));}
+  const ch=NODES.L6, c=document.createElement("div");
+  c.className="cluster";c.style.left=ch.x+"px";c.style.top=ch.y+"px";c.style.width=ch.w+"px";c.style.height=ch.h+"px";c.id="cl_L6";
+  c.innerHTML='<span class="clab">'+ch.lyr+' · channels — pluggable engines</span>';
+  const g=document.createElement("div");g.className="grid";g.style.gridTemplateColumns="1fr 1fr";
+  ch.children.forEach(cid=>g.appendChild(chipCard(cid)));c.appendChild(g);cv.appendChild(c);
+  const xc=document.createElement("div");
+  xc.className="cluster crosscut";xc.style.left="40px";xc.style.top="950px";xc.style.width="940px";xc.style.height="100px";xc.id="cl_XC";
+  xc.innerHTML='<span class="clab">Cross-cutting — applies across the whole engine · hover to see what each touches</span>';
+  const g2=document.createElement("div");g2.className="grid";g2.style.gridTemplateColumns="repeat(4,1fr)";
+  ["ATLAS","FEEDBACK","GOV","OBS"].forEach(cid=>g2.appendChild(chipCard(cid,true)));
+  xc.appendChild(g2);cv.appendChild(xc);
+}
+function hltouch(ids,on){
+  if(MODE==="flow")return;
+  document.querySelectorAll(".node,.chip").forEach(e=>{e.classList.remove("rel");if(on)e.classList.add("dim");else e.classList.remove("dim");});
+  if(on)ids.forEach(i=>{const e=document.getElementById("node_"+i);if(e){e.classList.remove("dim");e.classList.add("rel");}});
+}
+function rct(id){
+  let el=document.getElementById("node_"+id);
+  if(id==="L6")el=document.getElementById("cl_L6");
+  if(!el)return null;
+  return {l:el.offsetLeft,t:el.offsetTop,w:el.offsetWidth,h:el.offsetHeight,
+    cx:el.offsetLeft+el.offsetWidth/2,cy:el.offsetTop+el.offsetHeight/2,
+    r:el.offsetLeft+el.offsetWidth,b:el.offsetTop+el.offsetHeight};
+}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function pathFor(e){
+  const A=rct(e.f),B=rct(e.t);if(!A||!B)return null;let p=[];
+  if(e.r==="v"){
+    if(e.t==="SPINE"){const x=A.cx;p=[[x,A.b],[x,B.t]];}
+    else if(e.f==="SPINE"){const x=clamp(B.cx,A.l+14,A.r-14);p=[[x,A.b],[x,B.t]];}
+    else{const ax=A.cx,bx=B.cx,my=(A.b+B.t)/2;p=ax===bx?[[ax,A.b],[bx,B.t]]:[[ax,A.b],[ax,my],[bx,my],[bx,B.t]];}
+  }else if(e.r==="h"){
+    const ay=A.cy,by=B.cy,mx=(A.r+B.l)/2;p=ay===by?[[A.r,ay],[B.l,by]]:[[A.r,ay],[mx,ay],[mx,by],[B.l,by]];
+  }else if(e.r==="laneL"){p=[[A.l,A.cy],[e.lane,A.cy],[e.lane,e.toY],[B.l,e.toY]];}
+  else if(e.r==="laneR"){p=[[A.r,A.cy],[e.lane,A.cy],[e.lane,e.toY],[B.r,e.toY]];}
+  else if(e.r==="loopTop"){p=[[A.r,A.cy],[e.lane,A.cy],[e.lane,e.topY],[B.cx,e.topY],[B.cx,B.t]];}
+  return p;
+}
+function dStr(p){return "M "+p.map(x=>x[0]+" "+x[1]).join(" L ");}
+function renderEdges(){
+  [...svg.querySelectorAll("g.edge")].forEach(g=>g.remove());
+  EDGES.forEach((e,i)=>{
+    const p=pathFor(e);if(!p)return;
+    const g=document.createElementNS(svg.namespaceURI,"g");g.setAttribute("class","edge");
+    const hit=document.createElementNS(svg.namespaceURI,"path");hit.setAttribute("class","hit");hit.setAttribute("d",dStr(p));
+    const vis=document.createElementNS(svg.namespaceURI,"path");
+    vis.setAttribute("class","vis"+(e.dash?" dash":"")+(e.accent?" accent":""));
+    vis.setAttribute("d",dStr(p));vis.setAttribute("marker-end","url(#arr)");
+    if(e.bidir)vis.setAttribute("marker-start","url(#arr)");
+    g.appendChild(hit);g.appendChild(vis);
+    if(e.label){
+      const t=document.createElementNS(svg.namespaceURI,"text");t.setAttribute("class","elabel");
+      let lx,ly;
+      if(e.r==="laneL"){lx=e.lane+6;ly=(e.toY+p[0][1])/2;t.setAttribute("text-anchor","start");}
+      else if(e.r==="laneR"){lx=e.lane-6;ly=(e.toY+p[0][1])/2;t.setAttribute("text-anchor","end");}
+      else if(e.r==="loopTop"){lx=(e.lane+rct(e.t).cx)/2;ly=e.topY-6;t.setAttribute("text-anchor","middle");}
+      else{lx=(p[0][0]+p[p.length-1][0])/2+8;ly=(p[0][1]+p[p.length-1][1])/2-4;t.setAttribute("text-anchor","start");}
+      t.setAttribute("x",lx);t.setAttribute("y",ly);t.textContent=e.label;g.appendChild(t);
+    }
+    g.style.cursor="pointer";g.onclick=(ev)=>{ev.stopPropagation();openEdge(i);};
+    svg.appendChild(g);
+  });
+  svg.setAttribute("viewBox","0 0 "+cv.offsetWidth+" "+cv.offsetHeight);
+}
+const panel=document.getElementById("panel"), scrim=document.getElementById("scrim");
+function list(a){return '<ul class="li">'+a.map(x=>'<li>'+x+'</li>').join("")+'</ul>';}
+function openNode(id){
+  const n=NODES[id]; closeLegend();
+  document.getElementById("panLayer").textContent=n.lyr||"";
+  document.getElementById("panTitle").textContent=n.title;
+  const st=bstat(n);
+  let tg='<span class="pill '+(n.ai==="Rule"?"rule":(n.ai==="Store"?"store":""))+'">'+n.ai+'</span>';
+  if(n.gate)tg+='<span class="bge built" style="border-color:var(--b900);background:var(--b900);color:#fff">Human in the loop</span>';
+  if(st==="built")tg+='<span class="bge built">Built in-house</span>';
+  else if(st==="integrated")tg+='<span class="bge">Integrated (API)</span>';
+  else if(st==="ext")tg+='<span class="bge locked">External</span>';
+  document.getElementById("panTags").innerHTML=tg;
+  let h='<div class="sec"><p class="lead">'+n.purpose+'</p></div>';
+  if(n.inputs||n.outputs){h+='<div class="sec"><div class="cols">';
+    if(n.inputs)h+='<div><h4>Inputs</h4>'+list(n.inputs)+'</div>';
+    if(n.outputs)h+='<div><h4>Outputs</h4>'+list(n.outputs)+'</div>';h+='</div></div>';}
+  if(n.logic)h+='<div class="sec"><h3>How it decides</h3><p>'+n.logic+'</p></div>';
+  if(n.example)h+='<div class="sec"><h3>In practice - one lead</h3><div class="example">'+n.example+'</div></div>';
+  if(n.a&&n.b){h+='<div class="sec"><h3>How you would build this</h3>';
+    h+='<div class="opt"><div class="ohd"><span class="otag a">Option A · plug in a tool</span><span class="oname">'+n.a.name+'</span></div><p>'+n.a.desc+'</p>';
+    if(n.a.tools)h+='<div class="tools">'+n.a.tools.map(t=>'<span class="tool">'+t+'</span>').join("")+'</div>';h+='</div>';
+    h+='<div class="opt"><div class="ohd"><span class="otag b">Option B · build it yourself</span><span class="oname">'+n.b.name+'</span></div><p>'+n.b.desc+'</p></div>';
+    if(n.rec)h+='<div class="rec">'+n.rec+'</div>';
+    if(n.lockB&&PHASE==="B")h+='<div class="lockmsg">Phase B: '+n.lockB+'</div>';h+='</div>';}
+  if(n.open)h+='<div class="sec"><h3>Open decisions</h3>'+list(n.open)+'</div>';
+  if(n.touches){h+='<div class="sec"><h3>Touches</h3><div class="dep"><div>'+n.touches.map(t=>'<span>'+(NODES[t]?NODES[t].title:t)+'</span>').join("")+'</div></div></div>';}
+  else if(n.up||n.down){h+='<div class="sec"><h3>Dependencies</h3><div class="deps">';
+    const em='<span style="background:none;border:0;color:var(--faint);padding-left:0">—</span>';
+    h+='<div class="dep"><b>Upstream</b>'+(n.up&&n.up.length?n.up.map(x=>'<span>'+x+'</span>').join(""):em)+'</div>';
+    h+='<div class="dep"><b>Downstream</b>'+(n.down&&n.down.length?n.down.map(x=>'<span>'+x+'</span>').join(""):em)+'</div></div></div>';}
+  if(n.contract)h+='<div class="sec"><h3>Data contract</h3><div class="contract">'+n.contract+'</div></div>';
+  document.getElementById("panBody").innerHTML=h;
+  panel.classList.add("open");scrim.classList.add("show");
+}
+function openEdge(i){
+  const e=EDGES[i],A=NODES[e.f],B=NODES[e.t];closeLegend();
+  document.getElementById("panLayer").textContent="Connection";
+  document.getElementById("panTitle").textContent=A.title+"  to  "+B.title;
+  let tg='<span class="pill">from '+A.title+'</span><span class="pill">to '+B.title+'</span>';
+  if(e.accent)tg+='<span class="bge built">Learning loop</span>';
+  else if(e.dash)tg+='<span class="bge">Return path</span>';
+  document.getElementById("panTags").innerHTML=tg;
+  let h='<div class="sec"><p class="lead">'+e.c+'</p></div>';
+  h+='<div class="sec"><h3>What moves along this line</h3><div class="contract">'+(e.d||"-")+'</div></div>';
+  h+='<div class="sec"><h3>Where it goes next</h3><p>Open <b>'+B.title+'</b> to see what happens to this data, and how that step is built.</p></div>';
+  document.getElementById("panBody").innerHTML=h;
+  panel.classList.add("open");scrim.classList.add("show");
+}
+function closePanel(){panel.classList.remove("open");if(MODE!=="flow")scrim.classList.remove("show");}
+function closeAll(){closePanel();closeLegend();}
+function setPhase(p){
+  PHASE=p;
+  document.getElementById("pA").classList.toggle("on",p==="A");
+  document.getElementById("pB").classList.toggle("on",p==="B");
+  document.getElementById("phaseChip").textContent=p==="A"?"Phase A · own the brain, rent the pipes":"Phase B · evaluate full in-house";
+  document.getElementById("ctx").innerHTML=p==="A"
+    ?"<b>Phase A.</b> Build the brain, rent the pipes. Dashed boxes are integrated third-party tools."
+    :"<b>Phase B.</b> Enrichment and connectors flip to built; deliverability, WhatsApp, LinkedIn and the CRM stay integrated for good reason.";
+  renderNodes();renderEdges();
+  if(MODE==="flow")flowGoto(FI);
+}
+const FLOW=[
+ {n:"L0",t:"<b>Priya</b> attends our in-person roundtable on supply-chain AI — about the highest-intent source there is."},
+ {n:"L1",t:"Her details enter Ascent and are cleaned, de-duplicated and tagged roundtable — the top priority weight."},
+ {n:"IDR",t:"Ascent recognises she is the same person who opened two emails last quarter, and merges them into one record."},
+ {n:"L2",t:"Her title, seniority, function, company size and region are appended automatically."},
+ {n:"L3",t:"Atlas buckets her as AI & Data, senior leader, with high confidence; a human approves the taxonomy."},
+ {n:"L4",t:"The engine maps a supply-chain AI case study and a CDO point-of-view to her persona and stage."},
+ {n:"SPINE",t:"Her resolved, enriched, bucketed record now lives in the data spine — one source of truth for everyone."},
+ {n:"ELIG",t:"Ascent checks she is opted in, not an existing customer, and not already owned by sales — clear to engage."},
+ {n:"L5",t:"The brain decides the first move: an email leading with the roundtable hook plus the case study, Tuesday morning."},
+ {n:"CH_PLAT",t:"The email sends, and a personalised microsite — the home of Atlas — is prepared for her to land on."},
+ {n:"L7",t:"She opens, clicks, spends four minutes on the microsite and chats with Atlas — every event is captured."},
+ {n:"L8",t:"Her engagement score climbs; Atlas researches the account BANT, and a human verifies budget and timing."},
+ {n:"L9",t:"Now sales-ready and high priority, Priya is handed to the CRM with her full journey for a person to take over."},
+ {n:"CRM",t:"Whether she converts flows back into the spine, teaching the engine what good really looks like."}
+];
+let FI=0, FT=null;
+function clearFlow(){document.querySelectorAll(".node,.chip").forEach(e=>e.classList.remove("dim","hot","rel"));}
+function flowGoto(i){
+  FI=Math.max(0,Math.min(FLOW.length-1,i));const s=FLOW[FI];
+  clearFlow();
+  document.querySelectorAll(".node,.chip").forEach(e=>{if(e.dataset.id!==s.n)e.classList.add("dim");});
+  const el=document.getElementById("node_"+s.n);if(el){el.classList.remove("dim");el.classList.add("hot");scrollToNode(el);}
+  document.getElementById("fstep").textContent="Step "+(FI+1)+" of "+FLOW.length;
+  document.getElementById("ftxt").innerHTML=s.t;
+  document.getElementById("fprev").disabled=FI===0;
+  document.getElementById("fnext").disabled=FI===FLOW.length-1;
+  const pr=document.getElementById("fprog");pr.innerHTML="";
+  FLOW.forEach((_,k)=>{const b=document.createElement("i");b.className=k<FI?"done":(k===FI?"now":"");pr.appendChild(b);});
+}
+function flowStep(d){flowGoto(FI+d);if(FI===FLOW.length-1)flowStop();}
+function flowPlay(){if(FT){flowStop();return;}document.getElementById("fplay").innerHTML="&#10073;&#10073;";
+  FT=setInterval(()=>{if(FI>=FLOW.length-1){flowStop();return;}flowGoto(FI+1);},2600);}
+function flowStop(){if(FT){clearInterval(FT);FT=null;}document.getElementById("fplay").innerHTML="&#9654;";}
+function scrollToNode(el){const w=document.getElementById("wrap");
+  const x=el.offsetLeft*SCALE-w.clientWidth/2+el.offsetWidth*SCALE/2;
+  const y=el.offsetTop*SCALE-w.clientHeight/2+120;
+  w.scrollTo({left:Math.max(0,x),top:Math.max(0,y),behavior:"smooth"});}
+function setMode(m){
+  MODE=m;
+  document.getElementById("mMap").classList.toggle("on",m==="map");
+  document.getElementById("mFlow").classList.toggle("on",m==="flow");
+  document.getElementById("mDeep").classList.toggle("on",m==="deep");
+  const fb=document.getElementById("flowbar"),wrap=document.getElementById("wrap"),deep=document.getElementById("deep");
+  fb.classList.remove("show");flowStop();
+  if(m==="deep"){closePanel();closeLegend();clearFlow();wrap.style.display="none";deep.hidden=false;renderDeep();
+    document.getElementById("ctx").innerHTML="<b>How it works.</b> Try the interactive explainers - drag, toggle and click to see each mechanism run.";return;}
+  deep.hidden=true;wrap.style.display="";
+  if(m==="flow"){closePanel();closeLegend();
+    document.getElementById("ctx").innerHTML="<b>Lead flow.</b> Follow one lead, Priya, who attended a roundtable, from first touch to sales.";
+    fb.classList.add("show");flowGoto(0);}
+  else{clearFlow();
+    document.getElementById("ctx").innerHTML="<b>System map.</b> Click any box to open it. Click any line to see what data moves.";}
+}
+const legend=document.getElementById("legend");
+function toggleLegend(){legend.classList.toggle("show");}
+function closeLegend(){legend.classList.remove("show");}
+let SCALE=1,FIT=1,UZ=1;
+function applyScale(){SCALE=Math.min(2,Math.max(.35,FIT*UZ));
+  document.getElementById("stage").style.transform="scale("+SCALE+")";
+  const w=document.getElementById("wrap");document.getElementById("stage").style.height=(1075+48)*SCALE+"px";}
+function computeFit(){const w=document.getElementById("wrap");FIT=Math.min(1,(w.clientWidth-20)/(1080+48));applyScale();}
+function zoom(d){if(d===0){UZ=1;}else{UZ=Math.min(2,Math.max(.5,UZ+d*0.15));}applyScale();}
+const TOUR=[
+ {h:"Welcome to Ascent",p:"This is the whole lead-nurture engine on one screen. Four quick things to know — tap Next.",sel:".brand"},
+ {h:"Two ways to look",p:"System map shows the architecture. Lead flow walks one real lead through every step in plain language.",sel:"#mMap"},
+ {h:"Phase A or B",p:"Toggle between renting the pipes (A) and full in-house (B) to see which boxes flip from integrated to built.",sel:"#pA"},
+ {h:"Everything is clickable",p:"Click any box for its full spec, or any line to see exactly what data moves. The legend explains the colours.",sel:"#canvas"}
+];
+let TI=0;
+function startTour(){TI=0;showTour();}
+function showTour(){
+  const s=TOUR[TI],t=document.getElementById("tour"),sp=document.getElementById("spot");
+  document.getElementById("tourN").textContent="Tour · "+(TI+1)+" of "+TOUR.length;
+  document.getElementById("tourH").textContent=s.h;document.getElementById("tourP").textContent=s.p;
+  document.getElementById("tourBtn").textContent=TI===TOUR.length-1?"Done":"Next";
+  const dots=document.getElementById("tourDots");dots.innerHTML="";
+  TOUR.forEach((_,k)=>{const i=document.createElement("i");if(k===TI)i.className="on";dots.appendChild(i);});
+  const tg=document.querySelector(s.sel);
+  if(tg){const r=tg.getBoundingClientRect();
+    sp.classList.add("show");
+    sp.style.left=Math.max(6,r.left-6)+"px";sp.style.top=Math.max(6,r.top-6)+"px";
+    sp.style.width=Math.min(r.width+12,window.innerWidth-12)+"px";sp.style.height=Math.min(r.height+12,window.innerHeight-12)+"px";
+    let tx=Math.min(r.left,window.innerWidth-320),ty=r.bottom+12;
+    if(ty+150>window.innerHeight)ty=Math.max(12,r.top-160);
+    t.style.left=Math.max(8,tx)+"px";t.style.top=ty+"px";}
+  t.classList.add("show");
+}
+function tourNext(){if(TI>=TOUR.length-1){endTour();return;}TI++;showTour();}
+function endTour(){document.getElementById("tour").classList.remove("show");document.getElementById("spot").classList.remove("show");}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){closeAll();endTour();}
+  if(MODE==="flow"){if(e.key==="ArrowRight")flowStep(1);if(e.key==="ArrowLeft")flowStep(-1);}
+});
+const DEEPMETA=[
+ {tag:"Prioritisation",title:"How leads are prioritised by source",
+  lead:"Not all leads are equal. Each arrives stamped with where it came from, and that stamp sets a starting priority. Click a source to see what changes downstream.",
+  points:["In-person and live-event leads start hot; cold lists start cold.","Priority drives the timing, the opener and the first channel.","The source also supplies the opening hook."],viz:"w1"},
+ {tag:"Personalisation",title:"How email personalisation works",
+  lead:"One template, many tailored emails. Pick who is reading and watch the same skeleton fill with their details and angle, then point at a page built for them.",
+  points:["Slots fill from the record: name, company, role, source hook.","Persona sets the angle - value for a CFO, depth for a data lead.","The link opens a persona-specific page, not a generic site."],viz:"w2"},
+ {tag:"AI bucketing",title:"How AI bucketing & prioritisation works",
+  lead:"Sorting at scale, with a person kept in the loop only where needed. Drag the confidence bar to see how many leads sort automatically versus how many a person reviews.",
+  points:["A bucket is role family x seniority.","High-confidence picks pass automatically.","Raise the bar and more go to a person: safer, but a bigger queue."],viz:"w3"},
+ {tag:"Content mapping",title:"How content maps to each person",
+  lead:"A grid, not a guess. Every asset is tagged to a persona and a stage. Click any cell to see what that persona gets - and where the gaps are.",
+  points:["Rows are personas; columns are awareness, consideration, decision.","Each cell holds the best-matching assets.","Empty cells are gaps to fill, or for Atlas to draft."],viz:"w4"},
+ {tag:"Scoring",title:"How scoring works (engagement + BANT)",
+  lead:"Two scores, one decision. Toggle what the person has done, and set how real the account looks on BANT. Cross both lines and the lead turns sales-ready.",
+  points:["Engagement = weighted, capped, time-decayed behaviour.","BANT = budget, authority, need, timing; a person verifies it.","Both above the line = sales-ready, with a priority rank."],viz:"w5"}
+];
+let W={src:"round",persona:"data",conf:80,cellP:0,cellS:0,sig:{visit:true,click:true,download:false,webinar:false,meeting:false},bant:{B:1,A:1,N:1,T:0}};
+function vizHTML(k){try{return {w1:w1html,w2:w2html,w3:w3html,w4:w4html,w5:w5html}[k]();}catch(e){return "";}}
+function renderDeep(){
+  const d=document.getElementById("deep");
+  d.innerHTML=`<div class="dpintro"><h2>How the engine actually works</h2><p>Five interactive explainers for the parts that need more than a box on the map. Drag, toggle and click - same engine as the System map, just zoomed in.</p></div>`+
+    DEEPMETA.map((t,i)=>`<section class="dcard"><span class="dnum">${i+1}</span><div class="dtext"><span class="deyebrow">${t.tag}</span><h3>${t.title}</h3><p>${t.lead}</p><ul class="li">${t.points.map(p=>`<li>${p}</li>`).join("")}</ul></div><div class="dviz">${vizHTML(t.viz)}</div></section>`).join("");
+  if(typeof w1pick=="function")w1pick(W.src);
+  if(typeof w2pick=="function")w2pick(W.persona);
+  if(typeof w3update=="function")w3update();
+  if(typeof w4pick=="function")w4pick(W.cellP,W.cellS);
+  if(typeof w5update=="function")w5update();
+}
+const W1D={round:{w:5,t:"Within a day",o:"Warm + personal - 'great meeting you at the roundtable...'",c:"Email, then LinkedIn"},conf:{w:4,t:"Within 2 days",o:"Reference the event and a session they saw",c:"Email, then LinkedIn"},web:{w:3,t:"Within 3 days",o:"Reference the webinar topic",c:"Email"},gate:{w:2,t:"Within a week",o:"Build on the asset they downloaded",c:"Email"},cold:{w:1,t:"Slow drip",o:"Light, value-first, no assumptions",c:"Email only"}};
+function w1html(){const src=[["round","In-person roundtable"],["conf","Conference"],["web","Webinar"],["gate","Gated download"],["cold","Cold list"]];return `<div class="wbtns">${src.map(x=>`<button class="wbtn" id="w1_${x[0]}" onclick="w1pick('${x[0]}')">${x[1]}</button>`).join("")}</div><div class="wout" id="w1out"></div>`;}
+function w1pick(k){W.src=k;const d=W1D[k];["round","conf","web","gate","cold"].forEach(x=>{const b=document.getElementById("w1_"+x);if(b)b.classList.toggle("on",x===k);});const o=document.getElementById("w1out");if(!o)return;o.innerHTML=`<div class="wrow"><span class="k">Priority</span><span class="v">${d.w} of 5</span></div><div class="wbar"><i style="width:${d.w*20}%"></i></div><div class="wrow"><span class="k">First touch</span><span class="v">${d.t}</span></div><div class="wrow"><span class="k">First channel</span><span class="v">${d.c}</span></div><div class="wrow"><span class="k">Opening line</span><span class="v">${d.o}</span></div>`;}
+const W2D={cfo:{name:"Anita",role:"CFO",angle:"the ROI and payback of supply-chain AI",asset:"a value brief",cta:"See the numbers"},data:{name:"Priya",role:"Head of Data",angle:"the architecture behind supply-chain AI",asset:"a technical case study",cta:"See how it works"},ops:{name:"Rahul",role:"Ops Manager",angle:"fewer delays and smoother operations",asset:"an operations story",cta:"See the results"}};
+function w2html(){const p=[["cfo","CFO"],["data","Head of Data"],["ops","Ops Manager"]];return `<div class="wbtns">${p.map(x=>`<button class="wbtn" id="w2_${x[0]}" onclick="w2pick('${x[0]}')">${x[1]}</button>`).join("")}</div><div class="wmail" id="w2mail"></div>`;}
+function w2pick(k){W.persona=k;const d=W2D[k];["cfo","data","ops"].forEach(x=>{const b=document.getElementById("w2_"+x);if(b)b.classList.toggle("on",x===k);});const o=document.getElementById("w2mail");if(!o)return;o.innerHTML=`<div style="color:var(--muted);font-size:11px">Subject</div>Following up from the roundtable, <span class="slot">${d.name}</span><br><br>Hi <span class="slot">${d.name}</span> - great to connect at <span class="slot">Acme Logistics</span>. Given your focus, I thought you'd want <span class="slot">${d.asset}</span> on <span class="slot">${d.angle}</span>.<br><br><span style="display:inline-block;background:var(--b600);color:#fff;padding:6px 12px;border-radius:7px;font-weight:600">${d.cta}</span><div style="margin-top:10px;color:var(--muted);font-size:11px">Same template, ${d.role} angle - the link opens a page built for this persona.</div>`;}
+function w3html(){return `<div style="font-size:12px;color:var(--muted)">Confidence needed to auto-sort, without a person</div><input class="wslider" type="range" min="50" max="95" value="${W.conf}" oninput="W.conf=+this.value;w3update()"><div class="wrow"><span class="k">Threshold</span><span class="v" id="w3th"></span></div><div class="wstat"><div class="b"><b id="w3auto"></b><span>auto-sorted</span></div><div class="b"><b id="w3rev"></b><span>to a person</span></div></div><div id="w3note" style="font-size:12px;color:var(--muted);margin-top:10px"></div>`;}
+function w3update(){const th=W.conf;let review=Math.round((th-50)*1.55);if(review<3)review=3;if(review>70)review=70;const auto=100-review;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};set("w3th",th+"%");set("w3auto",auto);set("w3rev",review);const n=document.getElementById("w3note");if(n)n.textContent= th>=85?"Strict: very few mis-sorts, but a bigger review queue for people.":(th<=62?"Loose: almost everything auto-sorts, but more mistakes slip through.":"Balanced: most leads sort themselves; a person checks only the genuinely uncertain ones.");}
+const W4P=["AI & Data","Ops & SCM","Technology","Digital & CX"];
+const W4S=["Awareness","Consideration","Decision"];
+const W4M=[[["Logistics-AI explainer","Industry POV"],["Supply-chain case study"],["ROI calculator","Reference call"]],[["Ops automation blog"],["Warehouse case study","Webinar"],["Buyer checklist"]],[["Tech overview","Architecture POV"],["Integration deep-dive"],["Security & scale brief"]],[["CX trends report"],[],["Demo + pricing"]]];
+function w4html(){let h=`<div class="wgrid"><div></div>${W4S.map(x=>`<div class="hd">${x}</div>`).join("")}`;for(let p=0;p<4;p++){h+=`<div class="rl">${W4P[p]}</div>`;for(let st=0;st<3;st++){const a=W4M[p][st];const gap=a.length===0;h+=`<div class="wcell${gap?" gap":""}" id="w4_${p}_${st}" onclick="w4pick(${p},${st})">${gap?`<span>gap</span>`:a.map(()=>`<i class="dot"></i>`).join("")}</div>`;}}h+=`</div><div class="wdetail" id="w4det"></div>`;return h;}
+function w4pick(p,st){W.cellP=p;W.cellS=st;document.querySelectorAll(".wcell").forEach(c=>c.classList.remove("on"));const c=document.getElementById("w4_"+p+"_"+st);if(c)c.classList.add("on");const a=W4M[p][st];const det=document.getElementById("w4det");if(!det)return;det.innerHTML=a.length===0?`<b>${W4P[p]} &middot; ${W4S[st]}</b><br>No asset yet - this is a <b>content gap</b>. Atlas can draft a starter, or it goes on the content team list.`:`<b>${W4P[p]} &middot; ${W4S[st]}</b><br>Best matches: ${a.join(", ")}.`;}
+const W5SIG=[["visit","Visited the platform",10],["click","Clicked an email",8],["download","Downloaded an asset",14],["webinar","Attended a webinar",20],["meeting","Requested a meeting",35]];
+const W5BL={B:"Budget",A:"Authority",N:"Need",T:"Timing"};
+function w5html(){
+  const sig=`<div style="font-size:12px;color:var(--muted);margin-bottom:2px">Engagement - what the person did (tap to toggle)</div>`+W5SIG.map(x=>`<div class="wtog"><span>${x[1]} <span style="color:var(--muted)">+${x[2]}</span></span><span class="wpill" id="w5s_${x[0]}" onclick="w5sig('${x[0]}')">add</span></div>`).join("");
+  const bant=`<div style="font-size:12px;color:var(--muted);margin:12px 0 2px">BANT - how real the account is (a person verifies)</div>`+["B","A","N","T"].map(k=>`<div class="wtog"><span>${W5BL[k]}</span><span class="wseg">${[[0,"none"],[1,"some"],[2,"strong"]].map(o=>`<button id="w5b_${k}_${o[0]}" onclick="w5bant('${k}',${o[0]})">${o[1]}</button>`).join("")}</span></div>`).join("");
+  return sig+bant+`<div class="wresult" id="w5res"></div>`;
+}
+function w5sig(k){W.sig[k]=!W.sig[k];w5update();}
+function w5bant(k,v){W.bant[k]=v;w5update();}
+function w5update(){
+  W5SIG.forEach(x=>{const e=document.getElementById("w5s_"+x[0]);if(e){e.classList.toggle("on",W.sig[x[0]]);e.textContent=W.sig[x[0]]?"done":"add";}});
+  ["B","A","N","T"].forEach(k=>{[0,1,2].forEach(v=>{const e=document.getElementById("w5b_"+k+"_"+v);if(e)e.classList.toggle("on",W.bant[k]===v);});});
+  let eng=0;W5SIG.forEach(x=>{if(W.sig[x[0]])eng+=x[2];});if(eng>60)eng=60;const engPct=Math.round(eng/60*100);
+  const b=W.bant.B+W.bant.A+W.bant.N+W.bant.T;const bPct=Math.round(b/8*100);
+  const ready=engPct>=55&&bPct>=55;
+  const res=document.getElementById("w5res");if(!res)return;
+  res.className="wresult "+(ready?"yes":"no");
+  res.innerHTML=`${ready?"\u2713 Sales-ready":"Keep nurturing"} &nbsp; <span style="font-weight:400;font-size:12px">engagement ${engPct}% &middot; BANT ${bPct}%</span>`;
+}
+window.addEventListener("resize",computeFit);
+renderNodes();renderEdges();computeFit();
+</script>
+</body>
+</html>
